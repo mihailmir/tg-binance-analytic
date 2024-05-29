@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron, CronExpression, SchedulerRegistry } from '@nestjs/schedule';
 import { BinanceService } from './binance/binance.service';
-import { BinanceMarketData } from './schemas/binance.data.schema';
 import { CryptoCurrency } from './schemas/crypto.currency.schema';
 
 import { Model } from 'mongoose';
@@ -12,7 +11,6 @@ import { CronJob } from 'cron';
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
   constructor(
-    @InjectModel(BinanceMarketData.name)
     @InjectModel(CryptoCurrency.name)
     private cryptoCurrency: Model<CryptoCurrency>,
     private readonly schedulerRegistry: SchedulerRegistry,
@@ -22,7 +20,7 @@ export class TasksService {
   @Cron(CronExpression.EVERY_1ST_DAY_OF_MONTH_AT_MIDNIGHT)
   async handleMonthlyBinanceImport() {
     const currentDate = new Date();
-    const currencies = await this.cryptoCurrency.find({ isActive: true }); // Example symbols, should be retrieved from DB
+    const currencies = await this.cryptoCurrency.find({ isActive: true });
 
     // Schedule cron jobs for each symbol
     currencies.forEach((currency, index) => {

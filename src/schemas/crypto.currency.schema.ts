@@ -1,17 +1,19 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Types } from 'mongoose';
+
 
 @Schema({ timestamps: true })
 export class CryptoCurrency {
-  _id: string;
+  _id: Types.ObjectId;
 
-  @Prop({unique: true})
+  @Prop({ unique: true })
   symbol: string;
 
   @Prop()
-  descirption?: string; 
+  description?: string;
 
-  @Prop({default: true})
-  isActive?: boolean
+  @Prop({ default: true })
+  isActive?: boolean;
 
   @Prop()
   createdAt?: Date;

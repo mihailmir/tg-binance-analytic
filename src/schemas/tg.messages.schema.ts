@@ -1,16 +1,20 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument } from 'mongoose';
+import { HydratedDocument, Types } from 'mongoose';
 
 export type TgSignalDocument = HydratedDocument<TgSignal>;
 
 @Schema({ timestamps: true })
 export class TgSignal {
+  _id: Types.ObjectId;
 
-  @Prop()
-  tgChannelId: string;
+  @Prop({ required: true, type: Types.ObjectId})
+  tgChannelId: Types.ObjectId;
 
   @Prop()
   message: string;
+
+  @Prop()
+  postTimestamp?: number
 
   @Prop()
   createdAt?: Date

@@ -1,9 +1,10 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Types } from 'mongoose';
 
 @Schema({ timestamps: true })
 export class BinanceMarketData {
-  @Prop({ required: true })
-  currencyId: string;
+  @Prop({ required: true, type: Types.ObjectId})
+  currencyId: Types.ObjectId;
 
   @Prop({ required: true })
   open: number;

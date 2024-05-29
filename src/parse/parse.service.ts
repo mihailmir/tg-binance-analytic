@@ -5,10 +5,28 @@ import { Injectable } from '@nestjs/common';
 @Injectable()
 export class ParseService {
   private readonly logger = new Logger(ParseService.name);
-
+  private readonly targetCurrency = "USDT";
   constructor() {}
 
   parseSignal = async () => {
+  }
+
+  // isNeedToParse = (message: string): boolean =>  {
+  //     if (message.includes('imeframe:')) {
+  //       return true;
+  //     }
+  //   return false;
+  // }
+
+  getPair = (message: string): string | null => {
+    const regex = new RegExp(`(?:\\b|#)([A-Z]+)\\s*\\/?\\s*${this.targetCurrency}\\b`, 'i'); //regex pars value befoure target currency
+    const match = message.match(regex);
+
+    if (match) {
+      return `${match[1].toUpperCase()}${this.targetCurrency}`;
+    }
+
+    return null;
   }
 }
 

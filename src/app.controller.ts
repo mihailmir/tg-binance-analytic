@@ -1,9 +1,10 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { AppService } from './app.service';
-import { CreateSignalDto } from './dto/createSignal.dto';
+import { FetchMessagesDto } from './dto/fetchMessagesDto.dto';
 import { CreateTemplateDto } from './dto/createTemplate.dto';
-import { TgSignal } from './schemas/tg.messages.schema';
 import { ParsTemplate } from './schemas/tg.template.schema';
+import { CreateChannelDto } from './dto/createChannel.dto';
+import { TgChannel } from './schemas/tg.channel.schema';
 
 @Controller()
 export class AppController {
@@ -14,9 +15,16 @@ export class AppController {
     return this.appService.getHello();
   }
 
-  @Post('/signal')
-  createSignal(@Body() createSignalDto: CreateSignalDto): Promise<TgSignal> {
-    return this.appService.createSignal(createSignalDto);
+  @Post('/fetchMessages')
+  fetchMessages(@Body() fetchMessagesDto: FetchMessagesDto) {
+    return this.appService.fetchAndSaveMessages(fetchMessagesDto);
+  }
+
+  @Post('/channel')
+  createChannel(
+    @Body() createChannelDto: CreateChannelDto,
+  ): Promise<TgChannel> {
+    return this.appService.createChannel(createChannelDto);
   }
 
   @Post('/template')
