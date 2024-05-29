@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { TgSignal } from './schemas/tg.messages.schema';
 import { ParsTemplate } from './schemas/tg.template.schema';
-import { BinanceMarketData } from './schemas/binance.data.schema';
 
 import { Model } from 'mongoose';
 import { TelegramService } from './telegram/telegram.service';
@@ -15,7 +13,6 @@ export class AppService {
   constructor(
     @InjectModel(ParsTemplate.name)
     private parsTemplateModel: Model<ParsTemplate>,
-    @InjectModel(BinanceMarketData.name)
     private telegramService: TelegramService,
   ) {}
 
