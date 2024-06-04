@@ -1,4 +1,5 @@
-import { IsString } from 'class-validator';
+import { IsString, IsEnum } from 'class-validator';
+import { TemplateType } from '../schemas/tg.template.schema';
 
 export class CreateTemplateDto {
   @IsString()
@@ -6,4 +7,7 @@ export class CreateTemplateDto {
 
   @IsString()
   template: string;
+
+  @IsEnum(TemplateType)
+  type: TemplateType;
 }

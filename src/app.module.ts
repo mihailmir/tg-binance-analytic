@@ -20,6 +20,8 @@ import { ScheduleModule } from '@nestjs/schedule';
 import 'dotenv/config';
 import { TgChannelSchema, TgChannel } from './schemas/tg.channel.schema';
 import { TelegramService } from './telegram/telegram.service';
+import { CalculateService } from './calculate/calculate.service';
+import { TradeSchema, Trade } from './schemas/trades.schema';
 
 const { MONGO_URL } = process.env;
 @Module({
@@ -31,6 +33,8 @@ const { MONGO_URL } = process.env;
       { name: BinanceMarketData.name, schema: BinanceMarketDataSchema },
       { name: CryptoCurrency.name, schema: CryptoCurrencySchema },
       { name: TgChannel.name, schema: TgChannelSchema },
+      { name: Trade.name, schema: TradeSchema },
+
     ]),
     ScheduleModule.forRoot(),
   ],
@@ -41,6 +45,7 @@ const { MONGO_URL } = process.env;
     BinanceService,
     ParseService,
     TelegramService,
+    CalculateService
   ],
 })
 export class AppModule {}

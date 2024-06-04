@@ -1,7 +1,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
-export type TgSignalDocument = HydratedDocument<TgSignal>;
+export type TgSignalDocument = TgSignal & Document;
+
+export enum SignalType {
+  LONG = 'long',
+  SHORT = 'short',
+}
 
 @Schema({ timestamps: true })
 export class TgSignal {
@@ -12,6 +17,21 @@ export class TgSignal {
 
   @Prop()
   message: string;
+
+  @Prop()
+  pair: string;
+
+  @Prop({ default: [] })
+  entryTargets: number[];
+
+  @Prop({ default: [] })
+  profitTargets: number[];
+
+  @Prop()
+  stop: number;
+
+  @Prop({ type: String, enum: Object.values(SignalType) })
+  type: SignalType;
 
   @Prop()
   postTimestamp?: number

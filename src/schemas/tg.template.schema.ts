@@ -3,6 +3,13 @@ import { HydratedDocument, Types } from 'mongoose';
 
 export type ParsTemplateDocument = HydratedDocument<ParsTemplate>;
 
+
+export enum TemplateType {
+  ENTRY = 'entry',
+  TAKE_PROFIT = 'take-profit',
+  STOP_LOSS = 'stop-loss',
+}
+
 @Schema({ timestamps: true })
 export class ParsTemplate {
   _id: Types.ObjectId;
@@ -12,6 +19,10 @@ export class ParsTemplate {
 
   @Prop()
   template: string;
+
+
+  @Prop({ type: String, enum: Object.values(TemplateType) })
+  type: TemplateType;
 
   @Prop()
   createdAt?: Date;

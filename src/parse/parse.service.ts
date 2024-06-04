@@ -1,15 +1,108 @@
 import 'dotenv/config';
 import { Logger } from '@nestjs/common';
 import { Injectable } from '@nestjs/common';
+import { Types, Model } from 'mongoose';
+import { InjectModel } from '@nestjs/mongoose';
+import { TgSignal } from '../schemas/tg.messages.schema';
+import { ParsTemplate } from 'src/schemas/tg.template.schema';
+import { CreateTemplateDto } from 'src/dto/createTemplate.dto';
+
+const takeProfits: Record<string, number> = {};
+
+function parseSignal(signal) {
+  const targetCurrencyKeys = ['BTC', 'ETH', 'USDT', 'USD'];
+  const targetEntryKeys = [
+    'entry',
+    'entries',
+    'buy',
+    'Entry Zone',
+    'Entry Targets',
+    'Buy Zone',
+  ];
+  const takeProfitKeys = [
+    'Take-Profit Targets',
+    'Targets'
+  ];
+  const directionKeys = ['SHORT', 'LONG'];
+
+  const signalTypeKeys = [
+    'Signal',
+    'Signal type'
+  ];
+  const stopLoseKeys = ['stop', 'sl ', 'sl:', 'Stoploss'];
+  // const leverageKeys = ['Leverage', 'lev'];
+
+  const signalObj = {pair: null, signalType: null, entryTargets: null, leverage: null, profitTargets: null, stopTargets: null};
+  const createRegexFromArray = (array: string[]) => array.map(keyword => keyword.replace(/[\s:]/g, '\\s*')).join('|');
+
+  
+  // Регулярные выражения для поиска нужных данных
+  const pairMatch = signal.match( `(?:\\b|#)([A-Z]+)\\s*\\/?\\s*(${createRegexFromArray(targetCurrencyKeys)})\\b`, 'i');
+  const signalTypeMatch = signal.match(new RegExp(`(${createRegexFromArray(directionKeys)})`, 'i'));
+  // const leverageMatch = signal.match(new RegExp(`(?:${createRegexFromArray(leverageKeys)})(?:\\s*[:\\-\\s])\\s*([\\d\\w\\.xX_\\(\\)]+)`, 'i'));
+  const entryTargetsMatch = signal.match(new RegExp(`(?:${createRegexFromArray(targetEntryKeys)}):\\s*([\\s\\S]*?)(?=\\r\\n\\r\\n|$)`, 'i'));
+  const entryZoneMatch = signal.match(/Entry zone :\s*([\d\.-]+)/);
+  const profitTargetsMatch = signal.match(/Take-Profit Targets:\s*([\s\S]*?)(?=\r\n\r\n|$)/);
+  const targetsMatch = signal.match(/Targets :\s*([\d\.-]+)/);
+  const stopTargetsMatch = signal.match(/Stop Targets:\s*([\s\S]*?)(?=\r\n\r\n|$)/);
+  const stopLossMatch = signal.match(/Stop loss :\s*(\d+\.\d+)/i);
+
+  // Заполнение объекта на основе найденных данных
+  if (pairMatch) signalObj.pair = pairMatch[1];
+  if (signalTypeMatch) signalObj.signalType = signalTypeMatch[1];
+  // if (leverageMatch) signalObj.leverage = leverageMatch[1];
+  
+  if (entryTargetsMatch) {
+      signalObj.entryTargets = entryTargetsMatch[1].match(/\d+\.\d+/g).map(Number);
+  } else if (entryZoneMatch) {
+      signalObj.entryTargets = entryZoneMatch[1].split('-').map(Number);
+  }
+
+  if (profitTargetsMatch) {
+      signalObj.profitTargets = profitTargetsMatch[1].match(/\d+\.\d+/g).map(Number);
+  } else if (targetsMatch) {
+      signalObj.profitTargets = targetsMatch[1].split('-').map(Number);
+  }
+
+  if (stopTargetsMatch) {
+      signalObj.stopTargets = stopTargetsMatch[1].match(/\d+\.\d+/g).map(Number);
+  } else if (stopLossMatch) {
+      signalObj.stopTargets = [parseFloat(stopLossMatch[1])];
+  }
+  console.log(signalObj)
+  return signalObj;
+}
 
 @Injectable()
 export class ParseService {
   private readonly logger = new Logger(ParseService.name);
-  private readonly targetCurrency = "USDT";
-  constructor() {}
+  private readonly targetCurrencyKeys = ['BTC', 'ETH', 'USDT', 'USD'];
+  private readonly targetEntryKeys = [
+    'entry',
+    'entries',
+    'buy',
+    'Entry Zone',
+    'Entry Targets',
+    'Buy Zone',
+  ];
+  private readonly takeProfitKeys = [
+    'Take-Profit Targets:',
+    'take-profit',
+    'target',
+    'take',
+    'tp:',
+    'Targets',
+  ];
+  private readonly stopLoseKeys = ['stop', 'sl ', 'sl:', 'Stoploss'];
 
-  parseSignal = async () => {
-  }
+  constructor(
+    @InjectModel(TgSignal.name)
+    private tgSignal: Model<TgSignal>,
+    @InjectModel(TgSignal.name)
+    private parsTemplate: Model<ParsTemplate>,
+  ) {}
+
+  parseSignal = async () => {};
 
   // isNeedToParse = (message: string): boolean =>  {
   //     if (message.includes('imeframe:')) {
@@ -17,231 +110,106 @@ export class ParseService {
   //     }
   //   return false;
   // }
+  parseMessages = (messages) => {
+    // messages.forEach(m => {
+    //   const msgText = m.message;
+    //   m['pair'] = this.getPair(msgText);
+    //   m['take'] =
+
+    // });
+
+    // const messages = this.tgSignal.find()
+    return [];
+  };
 
   getPair = (message: string): string | null => {
-    const regex = new RegExp(`(?:\\b|#)([A-Z]+)\\s*\\/?\\s*${this.targetCurrency}\\b`, 'i'); //regex pars value befoure target currency
+    const keywordPattern = this.targetCurrencyKeys.join('|');
+    const regex = new RegExp(
+      `(?:\\b|#)([A-Z]+)\\s*\\/?\\s*(${keywordPattern})\\b`,
+      'i',
+    ); // The constructed regex
     const match = message.match(regex);
 
     if (match) {
-      return `${match[1].toUpperCase()}${this.targetCurrency}`;
+      this.logger.log(
+        `Matched Pair: ${match[0]}, Value: ${match[1]}, Currency: ${match[2]}`,
+      );
+      return `${match[1].toUpperCase()}${match[2].toUpperCase()}`;
     }
 
     return null;
+  };
+
+  getEntry = (message: string): string | null => {
+    const keywordPattern = this.targetEntryKeys
+      .map((keyword) => keyword.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'))
+      .join('|');
+    const regex = new RegExp(
+      `(?:${keywordPattern})[^\\d]*((?:(?:\\d+\\.?\\d*)[)\\s]*\\n?)+)`,
+      'ig',
+    );
+    const match = message.match(regex);
+
+    if (match) {
+      this.logger.log(
+        `Matched Entry Zone: ${match[0]}, Low: ${match[1]}, High: ${match[2]}`,
+      );
+      return `${match[1].toUpperCase()}${match[2]}`;
+    }
+
+    return null;
+  };
+
+  getStopLoss = (message: string): string | null => {
+    const keywordPattern = this.stopLoseKeys.join('|');
+    const regex = new RegExp(
+      `(?:\\b|#|\\s)(${keywordPattern})(?:\\s+|\\s*[:\\-])\\s*(\\d+(?:\\.\\d+)?)`,
+      'i',
+    );
+
+    const match = message.match(regex);
+
+    if (match) {
+      this.logger.log(
+        `Matched Stop Loss: ${match[0]}, key: ${match[1]}, value: ${match[2]}`,
+      );
+      return match[2];
+    }
+
+    return null;
+  };
+
+  getTakes = async (message: string) => {
+    parseSignal(message)
+    // const takeProfitPattern = this.takeProfitKeys
+    //   .map((phrase) => phrase.replace(/[-\s]/g, '[-\\s]?'))
+    //   .join('|');
+    // const regex = new RegExp(
+    //   `(?:${takeProfitPattern})[\\s\\S]*?((?:0\\.\\d{5}[\\s\\S]*?)+)(?=\\n\\s*⛔️|$)`,
+    //   'gi',
+    // );
+    // const match = regex.exec(message);
+
+    // if (!match) return [];
+
+    // const takeProfitsSection = match[1];
+    // const takeProfitsRegex = /0\.\d{5}/g;
+    // const takeProfits = [];
+    // let subMatch;
+
+    // while ((subMatch = takeProfitsRegex.exec(takeProfitsSection)) !== null) {
+    //   takeProfits.push(subMatch[0]);
+    // }
+    // console.log(takeProfits);
+    // Example message
+  };
+
+  async createParsTemplate(
+    createParsTemplateDto: CreateTemplateDto,
+  ): Promise<ParsTemplate> {
+    const createdParsTeamplate = await this.parsTemplate.create(
+      createParsTemplateDto,
+    );
+    return createdParsTeamplate.save();
   }
 }
-
-
-
-// import fs from 'fs';
-// import path from 'path';
-// import { parse } from 'json2csv';
-// import moment from 'moment';
-// import dotenv from 'dotenv';
-// import {
-//   PriceHistory,
-//   Signal,
-//   Direction
-// } from '../objects';
-// import {
-//   FileNamesDatabase,
-//   TradeSignalsDatabase
-// } from '../database';
-// import {
-//   DownloadPriceHistoryFromBinance
-// } from '../files';
-// import {
-//   DateFormatter
-// } from '../format';
-// import {
-//   Logs,
-//   TimeTracking
-// } from '../logs';
-// import {
-//   GlobalParameters
-// } from '../param';
-// import {
-//   SignalParser,
-//   Binance360,
-//   CryptoAmanSignalParser,
-//   DavidSmithSignalParser,
-//   DefaultSignalParser,
-//   SKIPEDAltSignalsFuturesParser,
-//   SKIPEDFortuneVipParser,
-//   Vilarso15mSignalParser
-// } from '../parsingSignals';
-// import {
-//   MainTester
-// } from '../testers';
-
-// dotenv.config();
-
-// export class ParseData {
-//   public static readonly MINUTE = 60;
-
-//   public static parsePriceHistoryOf(pair: string): PriceHistory {
-//     const datesRange = this.getDatesRange(pair);
-//     this.autoDownloadPriceHistory(pair, datesRange);
-
-//     const history = new PriceHistory(pair);
-//     this.parsePriceHistoryOfDates(datesRange, history);
-
-//     return history;
-//   }
-
-//   private static parsePriceHistoryOfDates(datesRange: string[], history: PriceHistory): void {
-//     TimeTracking.start('parseHistoryPrices');
-//     const fileNames = FileNamesDatabase.getHistoryFileNamesOf(history.getPair());
-
-//     if (fileNames) {
-//       Logs.print(`Parse Price history months - ${datesRange}`);
-//       fileNames.forEach(fileName => {
-//         if (datesRange.includes((fileName as HistoryFileName).getDate())) {
-//           this.parseHistoryPrices(fileName.getPathName(), history);
-//         }
-//       });
-//     }
-//     TimeTracking.end('parseHistoryPrices');
-
-//     if (history.isEmpty()) {
-//       Logs.error(`Can't parse price history of ${history.getPair()} - ${datesRange}`, 'PRICE_HISTORY PARSER');
-//       Logs.unknownPair(history.getPair());
-//     }
-//   }
-
-//   private static autoDownloadPriceHistory(pair: string, datesRange: string[]): void {
-//     TimeTracking.start('AutoDownload');
-//     if (GlobalParameters.isAutoDownloadPriceHistoryNeeded()) {
-//       const excludeRange = FileNamesDatabase.getPriceHistoryDatesRangeOf(pair);
-//       const datesRangeToDownload = datesRange.filter(v => !excludeRange.includes(v));
-//       this.downloadPriceHistory(pair, datesRangeToDownload);
-//     }
-//     TimeTracking.end('AutoDownload');
-//   }
-
-//   private static downloadPriceHistory(pair: string, datesRangeToDownload: string[]): void {
-//     if (datesRangeToDownload.length > 0) {
-//       DownloadPriceHistoryFromBinance.download(pair, datesRangeToDownload);
-//       FileNamesDatabase.updateHistoryFileNames();
-//     }
-//   }
-
-//   private static getDatesRange(pair: string): string[] {
-//     const globalRange = DateFormatter.getDatesRange(GlobalParameters.getDateFrom(), GlobalParameters.getDateTo());
-//     const signalRange = DateFormatter.getDatesRange(TradeSignalsDatabase.getMinDate(), TradeSignalsDatabase.getMaxDate());
-//     return globalRange.filter(date => signalRange.includes(date));
-//   }
-
-//   public static parseNextMonthToPriceHistory(priceHistory: PriceHistory): void {
-//     const from = priceHistory.getMaxDate() + this.MINUTE;
-//     const datesRange = DateFormatter.getDatesRange(from, from);
-//     const pair = priceHistory.getPair();
-//     this.autoDownloadPriceHistory(pair, datesRange);
-//     this.parsePriceHistoryOfDates(datesRange, priceHistory);
-//   }
-
-//   private static parseHistoryPrices(fileName: string, history: PriceHistory): void {
-//     const lines = fs.readFileSync(fileName, 'utf-8').split('\n').slice(1);
-
-//     lines.forEach(line => {
-//       const [dateStr, openStr, highStr, lowStr] = line.split(',', 4);
-//       const date = Math.floor(parseInt(dateStr, 10) / 1000);
-//       const open = parseFloat(openStr);
-//       const high = parseFloat(highStr);
-//       const low = parseFloat(lowStr);
-//       history.addPricePoint(date, open, high, low);
-//     });
-//   }
-
-//   public static parseChannel(id: string):  {
-//     // console.log(`tg channel - ${id}`);
-
-//     // const parser = this.getSignalParser(obj.id.toString());
-//     // const tgChannelData = this.fetchTgChannelData()
-//     // return this.signalsParser(obj.messages, parser);
-//   }
-
-// //   private static getSignalParser(channelId: string): SignalParser {
-// //    fetch parse template from db logic here
-// //   }
-
-//   private static signalsParser(arr: any[], signalParser: SignalParser): Map<string, Map<number, Signal>> {
-//     const signalsMap = new Map<string, Map<number, Signal>>();
-//     MainTester.testSignalJSONFile(arr, signalParser);
-
-//     arr.forEach(o => {
-//       signalParser.setJSONObject(o);
-
-//       const date = signalParser.getDate() + GlobalParameters.getOpenDateShift();
-//       if (!this.isNeedToParseDataOn(date) || !signalParser.isNeedToParse()) return;
-
-//       const pair = signalParser.getPair();
-//       if (!this.isNeedToParsePair(pair)) return;
-
-//       this.addSignalToMap(signalsMap, date, pair, signalParser.getEntriesList(), signalParser.getTakesList(), signalParser.getStop(), signalParser.getDirection());
-//     });
-
-//     if (signalsMap.size === 0) {
-//       Logs.error(`Can't parse signals from - ${arr[0]}`, 'GLOBAL Signals PARSER');
-//     }
-
-//     return signalsMap;
-//   }
-
-//   private static addSignalToMap(signalsMap: Map<string, Map<number, Signal>>, date: number, pair: string, entriesList: number[], takesList: number[], stop: number, direction: Direction): void {
-//     if (!Signal.isPointsOK(entriesList, takesList, stop, direction)) {
-//       Logs.errorSignal(date, pair, direction, entriesList, takesList, stop, '-', 'SIGNAL');
-//       return;
-//     }
-
-//     const truncatedDate = Math.floor(date / this.MINUTE) * this.MINUTE;
-//     if (!signalsMap.has(pair)) {
-//       signalsMap.set(pair, new Map<number, Signal>());
-//     }
-
-//     signalsMap.get(pair)!.set(truncatedDate, new Signal(entriesList, takesList, stop, truncatedDate, direction, pair));
-//   }
-
-//   private static isNeedToParseChannel(id: any): boolean {
-//     return !GlobalParameters.getChannelID() || GlobalParameters.getChannelID() === id.toString();
-//   }
-
-//   private static isNeedToParseDataOn(date: number): boolean {
-//     return this.isNeedToParsePriceHistoryOfRange(date, date);
-//   }
-
-//   private static isNeedToParsePriceHistoryOfRange(from: number, to: number): boolean {
-//     return GlobalParameters.getDateFrom() <= to && GlobalParameters.getDateTo() >= from;
-//   }
-
-//   private static isNeedToParsePair(pair: string | null): boolean {
-//     if (!pair || ['x', 'na', 'KSHIBUSDT'].includes(pair.toLowerCase())) return false;
-
-//     if (GlobalParameters.getWhitelist().length > 0) {
-//       return GlobalParameters.getWhitelist().includes(pair);
-//     }
-
-//     return !GlobalParameters.getBlacklist().includes(pair);
-//   }
-
-//   public static getListOfSignalsFileNameOfID(listOfAll: SignalsFileName[], channelID: string): SignalsFileName[] {
-//     if (!channelID) return listOfAll;
-
-//     return listOfAll.filter(signalsFileName => this.parseChannelID(signalsFileName) === channelID);
-//   }
-
-//   private static parseChannelID(signalsFileName: SignalsFileName): string {
-//     const lines = fs.readFileSync(signalsFileName.getPathName(), 'utf-8').split('\n').slice(0, 6);
-
-//     for (const line of lines) {
-//       const startIdx = line.indexOf('"id": ');
-//       if (startIdx !== -1) {
-//         const endIdx = line.indexOf(',', startIdx + 6);
-//         if (endIdx > startIdx) {
-//           return line.substring(startIdx + 6, endIdx);
-//         }
-//       }
-//     }
-
-//     return '';
-//   }
-// }

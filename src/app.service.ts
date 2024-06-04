@@ -7,6 +7,8 @@ import { TelegramService } from './telegram/telegram.service';
 import { CreateChannelDto } from './dto/createChannel.dto';
 import { TgChannel } from './schemas/tg.channel.schema';
 import { FetchMessagesDto } from './dto/fetchMessagesDto.dto';
+import { CalculateService } from './calculate/calculate.service';
+import { GenerateReportDto } from './dto/generateReport.dto';
 
 @Injectable()
 export class AppService {
@@ -14,6 +16,7 @@ export class AppService {
     @InjectModel(ParsTemplate.name)
     private parsTemplateModel: Model<ParsTemplate>,
     private telegramService: TelegramService,
+    private calculateService: CalculateService
   ) {}
 
   getHello(): string {
@@ -22,6 +25,11 @@ export class AppService {
 
   async fetchAndSaveMessages(fetchMessagesDto: FetchMessagesDto) {
     this.telegramService.fetchAndSaveMessages(fetchMessagesDto);
+    return { status: 'OK' };
+  }
+
+  async generateReport(generateReportDto: GenerateReportDto) {
+    this.calculateService.runCalculation(generateReportDto)
     return { status: 'OK' };
   }
 

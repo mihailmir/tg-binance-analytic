@@ -3,6 +3,8 @@ import { Types } from 'mongoose';
 
 @Schema({ timestamps: true })
 export class BinanceMarketData {
+  _id: Types.ObjectId;
+
   @Prop({ required: true, type: Types.ObjectId})
   currencyId: Types.ObjectId;
 
@@ -20,6 +22,9 @@ export class BinanceMarketData {
 
   @Prop({ required: true })
   volume: number;
+
+  @Prop({ required: true })
+  openTime: number;
 
   @Prop({ required: true })
   closeTime: number;

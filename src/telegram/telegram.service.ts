@@ -25,11 +25,9 @@ export class TelegramService {
     private tgChannel: Model<TgChannel>,
     @InjectModel(TgSignal.name)
     private tgSignal: Model<TgSignal>,
-  ) {
-    this.init();
-  }
+  ) {}
 
-  async init() {
+  async connect() {
     this.client = new TelegramClient(
       this.stringSession,
       this.apiId,
@@ -38,13 +36,16 @@ export class TelegramService {
         connectionRetries: 5,
       },
     );
-
     const connected = await this.client.connect();
     const me = await this.client.getMe();
 
     this.logger.log(`Connect: ${connected}`);
     this.logger.log(`Connect: ${me.username}`);
     this.logger.log('Telegram client initialized and connected.');
+  }
+
+  async disconnect() {
+    this.client.disconnect()
   }
 
   async fetchMessages(
@@ -101,21 +102,21 @@ export class TelegramService {
     }
   }
 
-  async upsertMessages(messages, tgChannelId: string) {
+  async updateOrCreateMessages(messages, tgChannelId: string) {
     // TODO: Refactor this function to improve performance. Probably exists a better solution for avoid duplicates
     const tgChannelObjectId = new Types.ObjectId(tgChannelId);
     const bulkMessages = messages.map((m) => ({
       updateOne: {
         filter: {
           tgChannelId: tgChannelObjectId,
-          postTimestamp: m.date,
+          postTimestamp: m.date * 1000, // to milliseconds
           message: m.message,
         },
         update: {
           $set: {
             tgChannelId: tgChannelObjectId,
             message: m.message,
-            postTimestamp: m.date,
+            postTimestamp: m.date * 1000, // to milliseconds,
           },
         },
         upsert: true,
@@ -137,6 +138,8 @@ export class TelegramService {
     excludeReplies: boolean = true,
   ) {
     // TODO: move to cron background ??
+    await this.connect();
+
     const telegramChannel = await this.tgChannel.findById(
       fetchMessagesDto.tgChannelId,
     );
@@ -146,7 +149,9 @@ export class TelegramService {
       batchSize,
       excludeReplies,
     );
-    await this.upsertMessages(messages, fetchMessagesDto.tgChannelId);
+    await this.updateOrCreateMessages(messages, fetchMessagesDto.tgChannelId);
+
+    await this.disconnect()
   }
 
   async getChannelName(channelId: string) {

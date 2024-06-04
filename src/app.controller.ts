@@ -2,6 +2,8 @@ import { Body, Controller, Get, Post } from '@nestjs/common';
 import { AppService } from './app.service';
 import { FetchMessagesDto } from './dto/fetchMessagesDto.dto';
 import { CreateTemplateDto } from './dto/createTemplate.dto';
+import { GenerateReportDto } from './dto/generateReport.dto';
+
 import { ParsTemplate } from './schemas/tg.template.schema';
 import { CreateChannelDto } from './dto/createChannel.dto';
 import { TgChannel } from './schemas/tg.channel.schema';
@@ -32,5 +34,12 @@ export class AppController {
     @Body() createTemplateDto: CreateTemplateDto,
   ): Promise<ParsTemplate> {
     return this.appService.createParsTemplate(createTemplateDto);
+  }
+
+  @Post('/generateReport')
+  generateReport(
+    @Body() generateReportDto: GenerateReportDto,
+  ) {
+    return this.appService.generateReport(generateReportDto);
   }
 }
