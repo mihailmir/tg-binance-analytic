@@ -63,10 +63,7 @@ export class CalculateService {
         },
         currencyId: currency._id,
       });
-      const trade = await this.calculateProfitability(
-        signal,
-        candles,
-      );
+      const trade = await this.calculateProfitability(signal, candles);
       tradesToSave.push(trade);
     }
     await this.updateOrCreateTrade(tradesToSave);
@@ -89,6 +86,7 @@ export class CalculateService {
     const trade = new Trade();
     trade.signalId = new Types.ObjectId(_id);
     trade.tgChannelId = tgChannelId;
+    trade.status = TradeStatus.LIMIT;
 
     const getAverage = (numbers: number[]) =>
       numbers.reduce((acc, number) => acc + number, 0) / numbers.length;
@@ -103,6 +101,12 @@ export class CalculateService {
 
     for (let candle of candles) {
       const { _id, openTime, high, low } = candle;
+      if (
+        (type == SignalType.LONG && entryPrice >= high) ||
+        (type == SignalType.SHORT && entryPrice <= low)
+      ) {
+        trade.status = TradeStatus.OPEN;
+      }
       if (type === SignalType.LONG) {
         if (low <= adjustedStopLoss) {
           hitStopLoss = true;
@@ -111,14 +115,13 @@ export class CalculateService {
 
         for (let i = 0; i < takeProfits.length; i++) {
           if (!achievedTakeProfits[i] && high >= takeProfits[i]) {
-            trade.status = TradeStatus.OPEN;
-
             let profitPercentage =
-              ((takeProfits[i] - entryPrice) / entryPrice) * 100;
-            totalProfitPercentage += profitPercentage * percentageClosed;
+              ((takeProfits[i] - entryPrice) / entryPrice) *
+              100 *
+              percentageClosed;
+            totalProfitPercentage += profitPercentage;
             remainingPosition -= percentageClosed;
             achievedTakeProfits[i] = true;
-
             const newAchievedTake = new AchievedTake();
             newAchievedTake.candleId = _id;
             newAchievedTake.profitPercentage = profitPercentage;
@@ -149,11 +152,11 @@ export class CalculateService {
 
         for (let i = 0; i < takeProfits.length; i++) {
           if (!achievedTakeProfits[i] && low <= takeProfits[i]) {
-            trade.status = TradeStatus.OPEN;
-
             let profitPercentage =
-              ((entryPrice - takeProfits[i]) / entryPrice) * 100;
-            totalProfitPercentage += profitPercentage * percentageClosed;
+              ((entryPrice - takeProfits[i]) / entryPrice) *
+              100 *
+              percentageClosed;
+            totalProfitPercentage += profitPercentage;
             remainingPosition -= percentageClosed;
             achievedTakeProfits[i] = true;
 
@@ -180,13 +183,14 @@ export class CalculateService {
         }
       }
       if (achievedTakeProfits.every((val) => val)) {
-        trade.status = TradeStatus.STOP;
+        trade.status = TradeStatus.TAKE;
         break;
       }
     }
 
     if (hitStopLoss) {
       let stopLossPercentage: number;
+      let isBreakeven = entryPrice === adjustedStopLoss;
       if (type === SignalType.LONG) {
         stopLossPercentage =
           ((adjustedStopLoss - entryPrice) / entryPrice) * 100;
@@ -195,16 +199,22 @@ export class CalculateService {
           ((entryPrice - adjustedStopLoss) / entryPrice) * 100;
       }
 
-      if (achievedTakeProfits.every((val) => !val)) {
+      if (trade.status === TradeStatus.LIMIT) {
         trade.status = TradeStatus.STOP_BEFORE_ENTRY;
-      } else if (achievedTakeProfits[0]) {
+      } else if (isBreakeven) {
         trade.status = TradeStatus.BREAKEVEN;
+      } else {
+        trade.status = TradeStatus.STOP;
       }
 
       this.logger.log(
         `Stop loss target ${stopLoss} achieved on candle ID: ${new Date(postTimestamp)}} `,
       );
-      totalProfitPercentage += stopLossPercentage * remainingPosition;
+      if (entryPrice === adjustedStopLoss) {
+        totalProfitPercentage = 0;
+      } else {
+        totalProfitPercentage += stopLossPercentage * remainingPosition;
+      }
     }
     trade.adjustedStop = adjustedStopLoss || signal.stop;
     trade.totalProfitPercentage = totalProfitPercentage;
