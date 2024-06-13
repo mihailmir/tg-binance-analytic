@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { Model, Types } from 'mongoose';
+import { Model, Types, Cursor } from 'mongoose';
 import { CalculateService } from './calculate.service';
 import { getModelToken } from '@nestjs/mongoose';
 import { TgSignal, SignalType } from '../schemas/tg.messages.schema';
@@ -40,6 +40,7 @@ describe('CalculateService', () => {
 
   describe('calculateProfitability', () => {
     it('should calculate profitability for multiple signals with multiple candles', async () => {
+      const currencyId = new Types.ObjectId('66571248240e90638a92938e');
       const signals: TgSignal[] = [
         {
           _id: new Types.ObjectId(), // all 5 targets acheved long case
@@ -97,11 +98,11 @@ describe('CalculateService', () => {
         },
       ] as TgSignal[];
 
-      const candlesMap: { [key: string]: BinanceMarketData[] } = {
+      const candlesMap: { [key: string]:  BinanceMarketData[] } = {
         [signals[0]._id.toString()]: [
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 1.0,
             high: 1.15,
             low: 0.95,
@@ -116,7 +117,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 1.1,
             high: 1.25,
             low: 1.05,
@@ -131,7 +132,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 1.2,
             high: 1.35,
             low: 1.15,
@@ -146,7 +147,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 1.3,
             high: 1.65,
             low: 1.25,
@@ -163,7 +164,7 @@ describe('CalculateService', () => {
         [signals[1]._id.toString()]: [
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 2.0,
             high: 2.15,
             low: 1.95,
@@ -178,7 +179,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 2.1,
             high: 2.05,
             low: 1.85,
@@ -193,7 +194,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 2.0,
             high: 1.95,
             low: 1.75,
@@ -208,7 +209,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 1.9,
             high: 1.85,
             low: 1.5,
@@ -225,7 +226,7 @@ describe('CalculateService', () => {
         [signals[2]._id.toString()]: [
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 1.4,
             high: 1.55,
             low: 1.3,
@@ -240,7 +241,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 1.5,
             high: 1.7,
             low: 1.6,
@@ -255,7 +256,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 1.6,
             high: 1.85,
             low: 1.6,
@@ -270,7 +271,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 1.7,
             high: 1.7,
             low: 1.6,
@@ -285,7 +286,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 1.75,
             high: 1.78,
             low: 1.7,
@@ -302,7 +303,7 @@ describe('CalculateService', () => {
         [signals[3]._id.toString()]: [
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 2,
             high: 2.15,
             low: 2.05,
@@ -317,7 +318,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 2.0,
             high: 2.15,
             low: 1.95,
@@ -332,7 +333,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 2.1,
             high: 2.05,
             low: 1.85,
@@ -347,7 +348,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 2.0,
             high: 1.95,
             low: 1.75,
@@ -362,7 +363,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 1.9,
             high: 1.85,
             low: 1.65,
@@ -379,7 +380,7 @@ describe('CalculateService', () => {
         [signals[4]._id.toString()]: [
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 1.0,
             high: 1.1,
             low: 0.95,
@@ -394,7 +395,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 1,
             high: 1.05,
             low: 0.95,
@@ -409,7 +410,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 0.9,
             high: 1,
             low: 0.85,
@@ -424,7 +425,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 1.3,
             high: 1.35,
             low: 1.25,
@@ -441,7 +442,7 @@ describe('CalculateService', () => {
         [signals[5]._id.toString()]: [
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 2.0,
             high: 2.05,
             low: 1.95,
@@ -456,7 +457,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 1.9,
             high: 2.2,
             low: 1.85,
@@ -471,7 +472,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 1.8,
             high: 1.85,
             low: 1.75,
@@ -486,7 +487,7 @@ describe('CalculateService', () => {
           },
           {
             _id: new Types.ObjectId(),
-            currencyId: new Types.ObjectId(),
+            currencyId: currencyId,
             open: 1.7,
             high: 1.75,
             low: 1.65,
@@ -513,7 +514,7 @@ describe('CalculateService', () => {
 
       for (const [index, signal] of signals.entries()) {
         const candles = candlesMap[signal._id.toString()];
-        const trade = await service.calculateProfitability(signal, candles);
+        const trade = await service.calculateProfitability(signal, candles, currencyId);
         console.log(JSON.stringify(trade));
 
         expect(trade).toBeDefined();

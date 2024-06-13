@@ -53,3 +53,5 @@ export class BinanceMarketData {
 
 export const BinanceMarketDataSchema =
   SchemaFactory.createForClass(BinanceMarketData);
+
+BinanceMarketDataSchema.index({ currencyId: 1, openTime: 1 }, { unique: true });

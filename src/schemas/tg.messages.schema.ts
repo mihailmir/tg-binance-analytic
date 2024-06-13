@@ -12,7 +12,7 @@ export enum SignalType {
 export class TgSignal {
   _id: Types.ObjectId;
 
-  @Prop({ required: true, type: Types.ObjectId})
+  @Prop({ required: true, type: Types.ObjectId })
   tgChannelId: Types.ObjectId;
 
   @Prop()
@@ -34,13 +34,23 @@ export class TgSignal {
   type: SignalType;
 
   @Prop()
-  postTimestamp?: number
+  postTimestamp?: number;
+
+  @Prop({ required: false })
+  reverseSignalId?: Types.ObjectId;
+
+  @Prop({ required: false })
+  reverseSignalDateTimestamp?: number;
 
   @Prop()
-  createdAt?: Date
+  createdAt?: Date;
 
   @Prop()
-  updatedAt?: Date
+  updatedAt?: Date;
 }
 
 export const TgSignalSchema = SchemaFactory.createForClass(TgSignal);
+TgSignalSchema.index(
+  { tgChannelId: 1, postTimestamp: 1, message: 1 },
+  { unique: true },
+);

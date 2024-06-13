@@ -1,14 +1,11 @@
-import 'dotenv/config';
-import Binance, { CandleChartInterval_LT } from 'binance-api-node';
-import { Logger } from '@nestjs/common';
-import { Injectable } from '@nestjs/common';
-import { CryptoCurrency } from '../schemas/crypto.currency.schema';
-import { BinanceMarketData } from '../schemas/binance.data.schema';
-import { Model } from 'mongoose';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import Binance, { CandleChartInterval_LT } from 'binance-api-node';
+import { BinanceMarketData } from 'src/schemas/binance.data.schema';
 
 interface FetchCandlesParams {
-  currency: CryptoCurrency;
+  currency: any;
   startDate: string;
   endDate: string;
   interval?: CandleChartInterval_LT;
@@ -24,20 +21,19 @@ export class BinanceService {
     private binanceMarketData: Model<BinanceMarketData>,
   ) {}
 
-  fetchAllCandles = async ({
+  private async *fetchCandlesGenerator({
     currency,
     startDate,
     endDate,
     interval = '1m',
     limit = 1000,
-  }: FetchCandlesParams) => {
-    let allCandles = [];
+  }: FetchCandlesParams) {
+    let startTime = new Date(startDate).getTime();
+    const endTime = new Date(endDate).getTime();
     const client = Binance();
-    let startTime = new Date(startDate).getTime(); // Convert startDate to timestamp
-    const endTime = new Date(endDate).getTime(); // Convert endDate to timestamp
 
     try {
-      while (true) {
+      while (startTime < endTime) {
         const candles = await client.futuresCandles({
           symbol: currency.symbol,
           interval: interval,
@@ -50,23 +46,16 @@ export class BinanceService {
           break;
         }
 
-        allCandles = allCandles.concat(candles);
+        yield candles;
 
         // Set startTime to the last candle's open time + 1 to avoid duplicate entries
         startTime = candles[candles.length - 1]['openTime'] + 1;
-
-        // Break the loop if the last candle is beyond the endTime or if we get less than the maximum limit, meaning we've fetched all available data
-        if (startTime >= endTime || candles.length < limit) {
-          break;
-        }
       }
-
-      return allCandles;
     } catch (error) {
       this.logger.error('Error fetching candles:', error);
       throw error;
     }
-  };
+  }
 
   fetchAndInsertAllCandles = async ({
     currency,
@@ -75,27 +64,41 @@ export class BinanceService {
     interval = '1m',
     limit = 1000,
   }: FetchCandlesParams) => {
-    const candles = await this.fetchAllCandles({
+    const candleGenerator = this.fetchCandlesGenerator({
       currency,
       startDate,
       endDate,
       interval,
       limit,
     });
-    const dataToInsert = candles.map((candle) => ({
-      ...candle,
-      currencyId: currency._id,
+
+    for await (const candles of candleGenerator) {
+      const dataToInsert = candles.map((candle) => ({
+        ...candle,
+        currencyId: currency._id,
+      })) as unknown as BinanceMarketData[];
+
+      await this.updateOrCreateCandle(dataToInsert);
+    }
+  };
+
+  updateOrCreateCandle = async (candles: BinanceMarketData[]) => {
+    const chunk = candles.map((c) => ({
+      updateOne: {
+        filter: {
+          openTime: c.openTime,
+          currencyId: new Types.ObjectId(c.currencyId),
+        },
+        update: c,
+        upsert: true,
+      },
     }));
-    await this.binanceMarketData.insertMany(dataToInsert);
+
+    try {
+      await this.binanceMarketData.bulkWrite(chunk);
+      this.logger.log(`Inserted batch of ${candles.length} candles`);
+    } catch (error) {
+      this.logger.error(`Error: ${error}`);
+    }
   };
 }
-
-// (async () => {
-//   try {
-//       const startDate = '2024-03-01T00:00:00Z'; // Start date for fetching data
-//       const endDate = '2024-03-31T23:59:59Z'; // End date for fetching data
-//       const candles = await fetchAllCandles('BTCUSDT', startDate, endDate);
-//   } catch (error) {
-//       console.error('Error:', error);
-//   }
-// })();

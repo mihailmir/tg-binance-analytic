@@ -20,6 +20,7 @@ export class TelegramService {
   private apiHash = TELEGRAM_API_HASH;
   private stringSession = new StringSession(TELEGRAM_SESSION);
   private client: TelegramClient;
+
   constructor(
     @InjectModel(TgChannel.name)
     private tgChannel: Model<TgChannel>,
@@ -45,17 +46,21 @@ export class TelegramService {
   }
 
   async disconnect() {
-    this.client.disconnect()
+    try {
+      await this.client.disconnect();
+      this.logger.log('Telegram client disconnected successfully.');
+    } catch (error) {
+      this.logger.error('Error disconnecting Telegram client:', error);
+    }
   }
 
-  async fetchMessages(
+  async *fetchMessagesGenerator(
     fetchMessagesDto: FetchMessagesDto,
     telegramChannel: TgChannel,
     batchSize: number = 100,
     excludeReplies: boolean = true,
   ) {
     const { startDate, endDate, tgChannelId } = fetchMessagesDto;
-    let allMessages = [];
     let offsetId: number;
 
     const startTimestamp = new Date(startDate).getTime() / 1000;
@@ -64,6 +69,7 @@ export class TelegramService {
     if (!telegramChannel) {
       throw new Error(`Channel with ID ${tgChannelId} not found`);
     }
+
     try {
       while (true) {
         const messages: any = await this.client.invoke(
@@ -77,6 +83,7 @@ export class TelegramService {
             limit: batchSize,
           }),
         );
+
         if (messages.messages.length === 0) {
           break; // No more messages to fetch
         }
@@ -86,16 +93,15 @@ export class TelegramService {
             (m: any) => m.replyTo === null,
           );
         }
-        allMessages = allMessages.concat(messages.messages);
+
+        yield messages.messages;
 
         const lastMessageId =
           messages.messages[messages.messages.length - 1].id;
         offsetId = lastMessageId;
 
-        await new Promise((resolve) => setTimeout(resolve, 0.3 * 1000)); // TODO: Refactor this sleep to improve performance ??
+        await new Promise((resolve) => setTimeout(resolve, 300)); // Sleep to avoid hitting rate limits
       }
-
-      return allMessages;
     } catch (error) {
       this.logger.error('Error fetching messages', error);
       throw new Error('Failed to fetch messages');
@@ -103,7 +109,6 @@ export class TelegramService {
   }
 
   async updateOrCreateMessages(messages, tgChannelId: string) {
-    // TODO: Refactor this function to improve performance. Probably exists a better solution for avoid duplicates
     const tgChannelObjectId = new Types.ObjectId(tgChannelId);
     const bulkMessages = messages.map((m) => ({
       updateOne: {
@@ -137,21 +142,24 @@ export class TelegramService {
     batchSize: number = 100,
     excludeReplies: boolean = true,
   ) {
-    // TODO: move to cron background ??
     await this.connect();
 
     const telegramChannel = await this.tgChannel.findById(
       fetchMessagesDto.tgChannelId,
     );
-    const messages = await this.fetchMessages(
+
+    const messageGenerator = this.fetchMessagesGenerator(
       fetchMessagesDto,
       telegramChannel,
       batchSize,
       excludeReplies,
     );
-    await this.updateOrCreateMessages(messages, fetchMessagesDto.tgChannelId);
 
-    await this.disconnect()
+    for await (const messages of messageGenerator) {
+      await this.updateOrCreateMessages(messages, fetchMessagesDto.tgChannelId);
+    }
+
+    await this.disconnect();
   }
 
   async getChannelName(channelId: string) {
